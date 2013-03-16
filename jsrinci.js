@@ -57,29 +57,38 @@ jsrinci.http_request = function(action, url, extra_keys, copts) {
         headers[hk] = hv;
     }
     headers['x-riap-fmt'] = 'json';
-    console.log("headers=" + JSON.stringify(headers)); // DEBUG
+    //console.log("headers=" + JSON.stringify(headers)); // DEBUG
 
     var args = rreq['args']===undefined ? {} : rreq['args'];
+    headers['content-type'] = 'application/json';
 
-    // put args in form fields
-    var postfields = {};
-    for (k in args) {
-        v = args[k];
-        if (v===null || !typeof(v).match(/^(string|number)$/)) {
-            postfields[k + ':j'] = JSON.stringify(v);
-        } else {
-            postfields[k] = v;
-        }
-    }
-    console.log("postfields=" + JSON.stringify(postfields)); // DEBUG
-    var postfields_s = ""
-    for (k in postfields) {
-        postfields_s += (postfields_s.length ?  "&" : "") + escape(k) + '=' + escape(v);
-    }
-    console.log("postfields_s=" + postfields_s); // DEBUG
+    var req_body;
 
-    var attempts = 0;
-    var do_retry = true;
+    // ALT A: put args in body as json
+    req_body = JSON.stringify(args);
+
+    // ALT B: put args in form fields (not guaranteed to work on all Riap servers)
+    //var postfields = {};
+    //for (k in args) {
+    //    v = args[k];
+    //    if (v===null || !typeof(v).match(/^(string|number)$/)) {
+    //        postfields[k + ':j'] = JSON.stringify(v);
+    //    } else {
+    //        postfields[k] = v;
+    //    }
+    //}
+    //console.log("postfields=" + JSON.stringify(postfields)); // DEBUG
+    //var postfields_s = ""
+    //for (k in postfields) {
+    //    postfields_s += (postfields_s.length ?  "&" : "") + escape(k) + '=' + escape(v);
+    //}
+    //console.log("postfields_s=" + postfields_s); // DEBUG
+    //req_body = postfields_s
+
+    headers['content-length'] = req_body.length;
+
+    // var attempts = 0;
+    // var do_retry = true;
     var xmlhttp;
     var err;
     var res;
@@ -87,14 +96,13 @@ jsrinci.http_request = function(action, url, extra_keys, copts) {
 
     while (true) {
         xmlhttp = new XMLHttpRequest();
-        for (k in headers) { xml.setRequestHeader(k, headers[k]) }
         xmlhttp.onreadystatechange = function() {
             if (xmlhttp.readyState==4) {
                 if (xmlhttp.status==200) {
                     try { data = eval(xmlhttp.responseText); }
                     catch(err) { res = [500, "Can't parse JSON: " + err] }
                     res = data;
-                    do_retry = false;
+                    // do_retry = false;
                 } else {
                     res = [xmlhttp.status, "HTTP error " + xmlhttp.status];
                 }
@@ -106,12 +114,15 @@ jsrinci.http_request = function(action, url, extra_keys, copts) {
         } else {
             xmlhttp.open("POST", url, true, copts['user'], copts['password']);
         }
-        xmlhttp.send(postfields_s);
+        for (k in headers) { xmlhttp.setRequestHeader(k, headers[k]) }
+        xmlhttp.send(req_body);
 
         //if (!do_retry) break;
         //attempts++;
         //if (attempts > retries) break;
         //sleep(retry_delay);
+
+        break;
     }
 };
 
